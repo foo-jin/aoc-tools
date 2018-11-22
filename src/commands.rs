@@ -1,19 +1,6 @@
 use super::DateValue;
 use reqwest::{header::COOKIE, Client, Response};
 
-fn prefix_session(cookie: &mut String) {
-    if !cookie.starts_with("session=") {
-        cookie.insert_str(0, "session=");
-    }
-}
-
-fn get_aoc_url(date: DateValue, postfix: &str) -> String {
-    format!(
-        "https://adventofcode.com/{}/day/{}/{}",
-        date.year, date.day, postfix
-    )
-}
-
 pub(crate) fn fetch<T: Into<String>>(
     date: DateValue,
     cookie: T,
@@ -46,4 +33,40 @@ pub(crate) fn submit<T: Into<String>>(
         .header(COOKIE, cookie)
         .send()
         .and_then(Response::error_for_status)
+}
+
+fn prefix_session(cookie: &mut String) {
+    if !cookie.starts_with("session=") {
+        cookie.insert_str(0, "session=");
+    }
+}
+
+fn get_aoc_url(date: DateValue, postfix: &str) -> String {
+    format!(
+        "https://adventofcode.com/{}/day/{}/{}",
+        date.year, date.day, postfix
+    )
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn prefix() {
+        let mut cookie = "test".to_string();
+        prefix_session(&mut cookie);
+        assert!(cookie.starts_with("session="));
+    }
+
+    #[test]
+    fn aoc_url() {
+        let date = DateValue {
+            year: 2018,
+            day: 22,
+        };
+        let result = get_aoc_url(date, "test");
+        let expected = "https://adventofcode.com/2018/day/22/test";
+        assert_eq!(&result, expected);
+    }
 }

@@ -86,6 +86,13 @@ impl Command {
     }
 }
 
+fn main() {
+    let command = Command::from_args();
+    if let Err(e) = command.execute() {
+        eprintln!("Error: {}", e);
+    }
+}
+
 fn extract_main(html_body: &str) -> String {
     use scraper::{Html, Selector};
 
@@ -93,11 +100,4 @@ fn extract_main(html_body: &str) -> String {
     let selector = Selector::parse("main").unwrap();
     let main = html.select(&selector).next().unwrap();
     main.text().map(str::trim).collect::<Vec<_>>().join(" ")
-}
-
-fn main() {
-    let command = Command::from_args();
-    if let Err(e) = command.execute() {
-        eprintln!("Error: {}", e);
-    }
 }
