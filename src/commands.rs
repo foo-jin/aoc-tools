@@ -1,45 +1,40 @@
-use super::DateValue;
+use super::{Config, DateValue};
 use reqwest::{header::COOKIE, Client, Response};
 
-pub(crate) fn fetch<T: Into<String>>(
-    date: DateValue,
-    cookie: T,
-) -> Result<reqwest::Response, reqwest::Error> {
-    let mut cookie = cookie.into();
-    prefix_session(&mut cookie);
+pub(crate) fn fetch(config: Config, date: DateValue) -> Result<reqwest::Response, reqwest::Error> {
     Client::new()
         .get(&get_aoc_url(date, "input"))
-        .header(COOKIE, cookie)
+        .header(COOKIE, config.api_key)
         .send()
         .and_then(Response::error_for_status)
 }
 
-pub(crate) fn submit<T: Into<String>>(
+pub(crate) fn submit(
+    config: Config,
     date: DateValue,
     level: u8,
     answer: String,
-    cookie: T,
-) -> Result<reqwest::Response, reqwest::Error> {
+) -> Result<String, reqwest::Error> {
     use maplit::hashmap;
 
-    let mut cookie = cookie.into();
-    prefix_session(&mut cookie);
-    Client::new()
+    let mut res_body = Client::new()
         .post(&get_aoc_url(date, "answer"))
         .form(&hashmap!{
              "answer" => answer,
              "level" => level.to_string(),
         })
-        .header(COOKIE, cookie)
+        .header(COOKIE, config.api_key)
         .send()
-        .and_then(Response::error_for_status)
+        .and_then(Response::error_for_status)?;
+    let res_text = res_body.text()?;
+
+    let msg = extract_main(&res_text);
+    Ok(msg)
 }
 
-fn prefix_session(cookie: &mut String) {
-    if !cookie.starts_with("session=") {
-        cookie.insert_str(0, "session=");
-    }
-}
+// pub(crate) fn fetch_leaderboard(&str) -> Vec<UserProgress> {
+//     unimplemented!();
+// }
 
 fn get_aoc_url(date: DateValue, postfix: &str) -> String {
     format!(
@@ -48,16 +43,18 @@ fn get_aoc_url(date: DateValue, postfix: &str) -> String {
     )
 }
 
+fn extract_main(html_body: &str) -> String {
+    use scraper::{Html, Selector};
+
+    let html = Html::parse_document(html_body);
+    let selector = Selector::parse("main").unwrap();
+    let main = html.select(&selector).next().unwrap();
+    main.text().map(str::trim).collect::<Vec<_>>().join(" ")
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
-
-    #[test]
-    fn prefix() {
-        let mut cookie = "test".to_string();
-        prefix_session(&mut cookie);
-        assert!(cookie.starts_with("session="));
-    }
 
     #[test]
     fn aoc_url() {

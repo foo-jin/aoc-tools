@@ -1,6 +1,10 @@
 use chrono::Datelike;
 use failure::format_err;
-use std::{io, io::Read};
+use serde_derive::{Deserialize, Serialize};
+use std::{
+    fs,
+    io::{self, Read},
+};
 use structopt::StructOpt;
 
 mod commands;
@@ -26,14 +30,14 @@ impl DateArgs {
     fn or_today(mut self) -> DateValue {
         let today = chrono::offset::Local::now();
 
-        if self.year.and(self.day).is_none() {
+        if self.year.is_none() && self.day.is_none() {
             self.year = Some(today.year() as u16);
             self.day = Some(today.day() as u8);
         }
 
         DateValue {
-            year: self.year.unwrap(),
-            day: self.day.unwrap(),
+            year: self.year.unwrap_or_default(),
+            day: self.day.unwrap_or_default(),
         }
     }
 }
@@ -57,27 +61,22 @@ enum Command {
 }
 
 impl Command {
-    fn execute(&self) -> Result<(), failure::Error> {
-        let session_cookie = dotenv::var("SESSION_COOKIE")?;
-
+    fn execute(&self, config: Config) -> Result<(), failure::Error> {
         match self {
             Command::Fetch { date } => {
                 let date = date.or_today();
-                let mut res_body = commands::fetch(date, session_cookie)
+                let mut res_body = commands::fetch(config, date)
                     .map_err(|e| format_err!("Failed to fetch input data -- {}", e))?;
                 io::copy(&mut res_body, &mut io::stdout().lock())?;
             }
             Command::Submit { date, level } => {
                 let date = date.or_today();
                 let mut answer = String::new();
+                // TODO: consider using generic `Read`
                 io::stdin().lock().read_to_string(&mut answer)?;
-                let mut res_body = commands::submit(date, *level, answer, session_cookie)
+                let msg = commands::submit(config, date, *level, answer)
                     .map_err(|e| format_err!("Failed to submit solution -- {}", e))?;
-                let res_text = res_body
-                    .text()
-                    .map_err(|e| format_err!("Malformed response -- {}", e))?;
 
-                let msg = extract_main(&res_text);
                 println!("{}", msg);
             }
         };
@@ -86,18 +85,36 @@ impl Command {
     }
 }
 
-fn main() {
-    let command = Command::from_args();
-    if let Err(e) = command.execute() {
-        eprintln!("Error: {}", e);
+#[derive(Debug, Serialize, Deserialize)]
+struct Config {
+    api_key: String,
+    #[serde(default)]
+    leaderboards: Vec<String>,
+}
+
+impl Config {
+    fn prefix_key(&mut self) {
+        if !self.api_key.starts_with("session=") {
+            self.api_key.insert_str(0, "session=");
+        }
     }
 }
 
-fn extract_main(html_body: &str) -> String {
-    use scraper::{Html, Selector};
-
-    let html = Html::parse_document(html_body);
-    let selector = Selector::parse("main").unwrap();
-    let main = html.select(&selector).next().unwrap();
-    main.text().map(str::trim).collect::<Vec<_>>().join(" ")
+fn main() {
+    if let Err(e) = run() {
+        eprintln!("Error: {}", e);
+        std::process::exit(1);
+    }
 }
+
+fn run() -> Result<(), failure::Error> {
+    let config_file = fs::read_to_string("aoc.toml")?;
+    // TODO: generate config file
+    let mut config = toml::from_str::<Config>(&config_file)
+        .map_err(|e| format_err!("Invalid configuration: {}", e))?;
+    config.prefix_key();
+
+    let command = Command::from_args();
+    command.execute(config)
+}
+
