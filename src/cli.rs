@@ -13,7 +13,7 @@ use self::commands::{Progress, StarProgress};
 
 #[derive(StructOpt, Clone, Copy)]
 pub struct DayArg {
-    /// The day of AoC to work with. Will attempt to default to the current day if not present.
+    /// The day of AoC to work with. Will default to the current day of the month if not present.
     #[structopt(short = "d", long = "day")]
     day: Option<u8>,
 }
@@ -27,11 +27,13 @@ impl DayArg {
 
 #[derive(StructOpt)]
 pub enum Command {
+    /// Get your input for a problem and write it to stdout
     #[structopt(name = "fetch")]
     Fetch {
         #[structopt(flatten)]
         day: DayArg,
     },
+    /// Submit a solution read from stdin
     #[structopt(name = "submit")]
     Submit {
         #[structopt(flatten)]
@@ -41,6 +43,7 @@ pub enum Command {
         #[structopt(short = "l", long = "level")]
         level: u8,
     },
+    /// Print the leaderboards in aoc.toml to stdout
     #[structopt(name = "leaderboard")]
     Leaderboard,
 }
