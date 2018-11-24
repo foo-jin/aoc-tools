@@ -2,7 +2,10 @@
 
 use failure::format_err;
 use serde_derive::{Deserialize, Serialize};
-use std::{fs, io};
+use std::{
+    env, fs, io,
+    path::{Path, PathBuf},
+};
 use structopt::StructOpt;
 
 mod cli;
@@ -38,13 +41,16 @@ fn run() -> Result<(), failure::Error> {
         return command.execute(Config::default());
     }
 
-    let config_file = match fs::read_to_string(CONFIG) {
+    let current_dir = env::current_dir()?;
+    let config_loc = find(current_dir, CONFIG)?;
+    let config_str = match fs::read_to_string(config_loc) {
         Ok(file) => file,
         Err(e) => match e.kind() {
             io::ErrorKind::NotFound => {
                 let err_msg = format_err!(
-                    "{config} could not be found in the current directory. \
-                     You can use 'aoc init' to create an example {config}",
+                    "{config} could not be found in the current directory \
+                     or any of its parent directories. Use 'aoc init' \
+                     to create an example {config}",
                     config = CONFIG
                 );
                 Err(err_msg)?
@@ -53,9 +59,39 @@ fn run() -> Result<(), failure::Error> {
         },
     };
 
-    let mut config = toml::from_str::<Config>(&config_file)
+    let mut config = toml::from_str::<Config>(&config_str)
         .map_err(|e| format_err!("Invalid configuration: {}", e))?;
     config.prefix_key();
 
     command.execute(config)
+}
+
+/// Searches for `filename` in `directory` and parent directories until found or root is reached.
+pub fn find<S, T>(directory: S, filename: T) -> io::Result<PathBuf>
+where
+    S: AsRef<Path>,
+    T: AsRef<Path>,
+{
+    let filename = filename.as_ref();
+    let directory = directory.as_ref();
+    let candidate = directory.join(filename);
+
+    match fs::metadata(&candidate) {
+        Ok(metadata) => {
+            if metadata.is_file() {
+                return Ok(candidate);
+            }
+        }
+        Err(e) => {
+            if e.kind() != io::ErrorKind::NotFound {
+                return Err(e);
+            }
+        }
+    }
+
+    if let Some(parent) = directory.parent() {
+        find(parent, filename)
+    } else {
+        Err(io::Error::new(io::ErrorKind::NotFound, "path not found"))
+    }
 }
