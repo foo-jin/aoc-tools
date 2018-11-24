@@ -2,10 +2,12 @@
 
 use failure::format_err;
 use serde_derive::{Deserialize, Serialize};
-use std::fs;
+use std::{fs, io};
 use structopt::StructOpt;
 
 mod cli;
+
+static CONFIG: &str = "aoc.toml";
 
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct Config {
@@ -31,12 +33,29 @@ fn main() {
 }
 
 fn run() -> Result<(), failure::Error> {
-    let config_file = fs::read_to_string("aoc.toml")?;
-    // TODO: generate config file
+    let command = cli::Command::from_args();
+    if let cli::Command::Init = command {
+        return command.execute(Config::default());
+    }
+
+    let config_file = match fs::read_to_string(CONFIG) {
+        Ok(file) => file,
+        Err(e) => match e.kind() {
+            io::ErrorKind::NotFound => {
+                let err_msg = format_err!(
+                    "{config} could not be found in the current directory. \
+                     You can use 'aoc init' to create an example {config}",
+                    config = CONFIG
+                );
+                Err(err_msg)?
+            }
+            _ => Err(e)?,
+        },
+    };
+
     let mut config = toml::from_str::<Config>(&config_file)
         .map_err(|e| format_err!("Invalid configuration: {}", e))?;
     config.prefix_key();
 
-    let command = cli::Command::from_args();
     command.execute(config)
 }

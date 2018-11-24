@@ -3,13 +3,15 @@ use failure::format_err;
 use prettytable::{cell, row, table};
 use std::{
     fmt,
-    io::{self, Read},
+    fs::File,
+    io::{self, Read, Write},
 };
 use structopt::StructOpt;
 
 mod commands;
 
 use self::commands::{Progress, StarProgress};
+use super::Config;
 
 #[derive(StructOpt, Clone, Copy)]
 pub struct DayArg {
@@ -27,6 +29,9 @@ impl DayArg {
 
 #[derive(StructOpt)]
 pub enum Command {
+    /// Create an example aoc.toml in the current directory
+    #[structopt(name = "init")]
+    Init,
     /// Get your input for a problem and write it to stdout
     #[structopt(name = "fetch")]
     Fetch {
@@ -49,8 +54,27 @@ pub enum Command {
 }
 
 impl Command {
-    pub fn execute(&self, config: super::Config) -> Result<(), failure::Error> {
+    pub fn execute(&self, config: Config) -> Result<(), failure::Error> {
         match self {
+            Command::Init => {
+                let api_key = promptly::prompt("Api key");
+                let today = chrono::offset::Local::now();
+                let year = promptly::prompt_default("Year", today.year()) as u16;
+                let config = Config {
+                    api_key,
+                    year,
+                    ..Config::default()
+                };
+
+                let toml = toml::to_string_pretty(&config)?;
+                let mut f = File::create(super::CONFIG)?;
+                f.write_all(toml.as_bytes())?;
+                println!(
+                    "Example {} created. Your api key is stored in plaintext \
+                     format, so avoid committing this file to vcs.",
+                    super::CONFIG
+                );
+            }
             Command::Fetch { day } => {
                 let day = day.or_today();
                 let mut res_body = commands::fetch(config, day)
