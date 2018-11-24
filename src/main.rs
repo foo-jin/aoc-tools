@@ -7,8 +7,7 @@ use structopt::StructOpt;
 
 mod cli;
 
-#[derive(Debug, Default)]
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Default, Serialize, Deserialize)]
 pub struct Config {
     api_key: String,
     year: u16,

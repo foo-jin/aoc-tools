@@ -42,7 +42,6 @@ pub fn fetch_leaderboard(config: &Config, id: u32) -> Result<Vec<User>, failure:
         .send()
         .and_then(Response::error_for_status)?;
 
-
     let json: json::Value = res.json()?;
     json.as_object()
         .and_then(|map| map.get("members"))
@@ -124,11 +123,7 @@ impl TryFrom<&json::Value> for User {
 
         for (i, val) in progress_map.into_iter() {
             let i = i.parse::<usize>()? - 1;
-            problems[i] = if val
-                .as_object()
-                .unwrap()
-                .contains_key("2")
-            {
+            problems[i] = if val.as_object().unwrap().contains_key("2") {
                 Progress::LevelTwo
             } else {
                 Progress::LevelOne
