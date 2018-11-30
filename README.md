@@ -9,10 +9,10 @@ If the binary is in PATH, you can run `aoc --help` for the usage instructions.
 
 ## Configuration
 `aoc` will look for a aoc.toml file in the current directory and it's parent directories. You can either add one manually, or create it with `aoc init`. Here is an example config:
-```toml
-api_key = <secret cookie>
-year = 2018
-leaderboards = [<leaderboard id>]
+```
+api_key = <secret cookie>         # required
+year = 2018                       # required
+leaderboards = [<leaderboard id>] # can be empty
 ```
 Since Advent of Code does not have an official API some of these values need to be digged up using a browser.
 The api key can be found in your cookies, it looks like this: `session=<lots of random characters and numbers>`.
